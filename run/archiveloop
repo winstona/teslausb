@@ -30,6 +30,7 @@ export CAM_MOUNT=/mnt/cam
 export MUSIC_MOUNT=/mnt/music
 export ARCHIVE_MOUNT=/mnt/archive
 export MUSIC_ARCHIVE_MOUNT=/mnt/musicarchive
+export ARCHIVE_RECENT_CLIPS=true
 
 function log () {
   echo -n "$( date ): " >> "$LOG_FILE"
@@ -290,7 +291,7 @@ function archive_teslacam_clips () {
   
     log "There are $DIR_COUNT event folder(s) with $FILE_COUNT file(s) to move."
   
-    if [ "$DIR_COUNT" -gt 0 ]
+    if [ "$DIR_COUNT" -gt 0 ] || [ "$ARCHIVE_RECENT_CLIPS" == "true" ]
     then
         log "Starting recording archiving: $DIR_COUNT event folder(s) with $FILE_COUNT file(s)"
 
