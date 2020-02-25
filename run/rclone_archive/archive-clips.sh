@@ -18,7 +18,7 @@ then
 fi
 
 log "Copying RecentClips"
-for dir in /backingfiles/snapshots/*/mnt/TeslaCam/RecentClips/; do
+for dir in /backingfiles/snapshots/*/mnt/TeslaCam/RecentClips/ "$CAM_MOUNT"/TeslaCam/RecentClips; do
     datePath="$(ls -1 $dir | perl -pe 's/^([0-9]{4}-[0-9]{2}-[0-9]{2})_.*/$1/g' | sort | uniq)"
     for date in $datePath; do
         rclone --config /root/.config/rclone/rclone.conf --include "${date}*" copy "$dir/" "$drive:$path"/RecentClips/$date/ >> "$LOG_FILE" 2>&1 || echo ""
