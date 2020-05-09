@@ -98,13 +98,11 @@ function snapshot {
   # space requirement, to delete old snapshots just before running out
   # of space and thus make better use of space
   local imgsize
-  # shellcheck disable=SC2046
-  imgsize=$(eval $(stat --format="echo \$((%b*%B))" /backingfiles/cam_disk.bin))
+  imgsize=$(eval "$(stat --format="echo \$((%b*%B))" /backingfiles/cam_disk.bin)")
   while true
   do
     local freespace
-    # shellcheck disable=SC2046
-    freespace=$(eval $(stat --file-system --format="echo \$((%f*%S))" /backingfiles/cam_disk.bin))
+    freespace=$(eval "$(stat --file-system --format="echo \$((%f*%S))" /backingfiles/cam_disk.bin)")
     if [ "$freespace" -gt "$imgsize" ]
     then
       break
@@ -114,10 +112,9 @@ function snapshot {
       log "warning: low space for snapshots"
       break
     fi
-    # shellcheck disable=SC2012
-    oldest=$(ls -ldC1 /backingfiles/snapshots/snap-* | head -1)
+    oldest=$(find /backingfiles/snapshots -maxdepth 1 -name 'snap-*' | sort | head -1)
     log "low space, deleting $oldest"
-    /root/bin/release_snapshot.sh "$oldest/mnt"
+    /root/bin/release_snapshot.sh "$oldest"
     rm -rf "$oldest"
   done
 
@@ -125,35 +122,43 @@ function snapshot {
   local newnum=0
   if stat /backingfiles/snapshots/snap-*/snap.bin > /dev/null 2>&1
   then
-    # shellcheck disable=SC2012
-    oldnum=$(ls -lC1 /backingfiles/snapshots/snap-*/snap.bin | tail -1 | tr -c -d '[:digit:]' | sed 's/^0*//' )
+    oldnum=$(find /backingfiles/snapshots/snap-* -maxdepth 1 -name snap.bin | sort | tail -1 | tr -c -d '[:digit:]' | sed 's/^0*//' )
     newnum=$((oldnum + 1))
   fi
   local oldname
   local newsnapdir
   oldname=/backingfiles/snapshots/snap-$(printf "%06d" "$oldnum")/snap.bin
-  newsnapdir=/backingfiles/snapshots/snap-$(printf "%06d" $newnum)
 
-  local newname=$newsnapdir/snap.bin
-  local tmpsnapdir=/backingfiles/snapshots/newsnap
-  local tmpsnapname=$tmpsnapdir/snap.bin
-  local tmpsnapmnt=$tmpsnapdir/mnt
-  log "taking snapshot of cam disk: $newname"
-  rm -rf "$tmpsnapdir"
-  /root/bin/mount_snapshot.sh /backingfiles/cam_disk.bin "$tmpsnapname" "$tmpsnapmnt"
+  # check that the previous snapshot is complete
+  if [ ! -e "${oldname}.toc" ]
+  then
+    log "previous snapshot was incomplete, deleting"
+    rm -rf "$(dirname "$oldname")"
+    newnum=$((oldnum))
+    oldnum=$((oldnum - 1))
+    oldname=/backingfiles/snapshots/snap-$(printf "%06d" "$oldnum")/snap.bin
+  fi
+
+  newsnapdir=/backingfiles/snapshots/snap-$(printf "%06d" $newnum)
+  newsnapmnt=/tmp/snapshots/snap-$(printf "%06d" $newnum)
+
+  local newsnapname=$newsnapdir/snap.bin
+  log "taking snapshot of cam disk in $newsnapdir"
+  /root/bin/mount_snapshot.sh /backingfiles/cam_disk.bin "$newsnapname" "$newsnapmnt"
   log "took snapshot"
 
   # check whether this snapshot is actually different from the previous one
-  find "$tmpsnapmnt/TeslaCam" -type f -printf '%s %P\n' > "$tmpsnapname.toc"
-  log "comparing $oldname.toc and $tmpsnapname.toc"
-  if [[ ! -e "$oldname.toc" ]] || diff "$oldname.toc" "$tmpsnapname.toc" | grep -e '^>'
+  find "$newsnapmnt/TeslaCam" -type f -printf '%s %P\n' > "${newsnapname}.toc_"
+  log "comparing new snapshot with $oldname"
+  if [[ ! -e "${oldname}.toc" ]] || diff "${oldname}.toc" "${newsnapname}.toc_" | grep -e '^>'
   then
-    make_links_for_snapshot "$tmpsnapmnt" "$newsnapdir/mnt"
-    mv "$tmpsnapdir" "$newsnapdir"
+    ln -s "$newsnapmnt" "$newsnapdir/mnt"
+    make_links_for_snapshot "$newsnapmnt" "$newsnapdir/mnt"
+    mv "${newsnapname}.toc_" "${newsnapname}.toc"
   else
     log "new snapshot is identical to previous one, discarding"
-    /root/bin/release_snapshot.sh "$tmpsnapmnt"
-    rm -rf "$tmpsnapdir"
+    /root/bin/release_snapshot.sh "$newsnapdir"
+    rm -rf "$newsnapdir"
   fi
 }
 

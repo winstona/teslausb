@@ -7,8 +7,8 @@ then
 fi
 
 function log_progress () {
-  # shellcheck disable=SC2034
-  if typeset -f setup_progress > /dev/null; then
+  if declare -F setup_progress > /dev/null
+  then
     setup_progress "configure: $1"
   fi
   echo "configure: $1"
@@ -346,8 +346,7 @@ function install_push_message_scripts() {
     get_script "$install_path" send_sns.py run
 }
 
-# shellcheck disable=SC2046
-if ! [ $(id -u) = 0 ]
+if [[ $EUID -ne 0 ]]
 then
     log_progress "STOP: Run sudo -i."
     exit 1
@@ -363,11 +362,7 @@ install_push_message_scripts /root/bin
 
 check_archive_configs
 
-configFile=/root/teslausb.conf
-
-echo "ARCHIVE_HOST_NAME=$archiveserver" > $configFile
-echo "ARCHIVE_DELAY=${archivedelay:-20}" >> $configFile
-echo "SNAPSHOTS_ENABLED=${SNAPSHOTS_ENABLED:-true}" >> $configFile
+rm -f /root/teslausb.conf
 
 archive_module="$( get_archive_module )"
 log_progress "Using archive module: $archive_module"

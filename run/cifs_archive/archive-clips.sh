@@ -12,7 +12,8 @@ function connectionmonitor {
     # shellcheck disable=SC2034
     for i in {1..5}
     do
-      if timeout 6 /root/bin/archive-is-reachable.sh "$ARCHIVE_HOST_NAME"
+      # shellcheck disable=SC2154
+      if timeout 6 /root/bin/archive-is-reachable.sh "$archiveserver"
       then
         # sleep and then continue outer loop
         sleep 5
@@ -53,7 +54,7 @@ function moveclips() {
     if [ -f "$ROOT/$file_name" ]
     then
       size=$(stat -c%s "$ROOT/$file_name")
-      if [ "$size" -lt 100000 ]
+      if [ "$size" -lt 100000 ] && [[ $file_name == *.mp4 ]]
       then
         log "'$SUB/$file_name' is only $size bytes"
         rm "$ROOT/$file_name"
@@ -81,13 +82,32 @@ connectionmonitor $$ &
 # new file name pattern, firmware 2019.*
 moveclips "$CAM_MOUNT/TeslaCam/SavedClips"
 
+# Create trigger file for SavedClips
+# shellcheck disable=SC2154
+if [ ! -z "${trigger_file_saved+x}" ]
+then 
+    log "Creating SavedClips Trigger File: $ARCHIVE_MOUNT/SavedClips/${trigger_file_saved}"
+    touch "$ARCHIVE_MOUNT/SavedClips/${trigger_file_saved}"
+fi
+
 # v10 firmware adds a SentryClips folder
 moveclips "$CAM_MOUNT/TeslaCam/SentryClips"
 
+# Create trigger file for SentryClips
+# shellcheck disable=SC2154
+if [ ! -z "${trigger_file_sentry+x}" ]
+then
+    log "Creating SentryClips Trigger File: $ARCHIVE_MOUNT/SentryClips/${trigger_file_sentry}"
+    touch "$ARCHIVE_MOUNT/SentryClips/${trigger_file_sentry}"
+fi
+
+# 2020.8.1 firmware adds a folder for track mode V2
+moveclips "$CAM_MOUNT/TeslaTrackMode"
+
 kill %1
 
-# delete empty directories under SavedClips and SentryClips
-rmdir --ignore-fail-on-non-empty "$CAM_MOUNT/TeslaCam/SavedClips"/* "$CAM_MOUNT/TeslaCam/SentryClips"/* || true
+# delete empty directories under SavedClips, SentryClips and TeslaTrackMode
+rmdir --ignore-fail-on-non-empty "$CAM_MOUNT/TeslaCam/SavedClips"/* "$CAM_MOUNT/TeslaCam/SentryClips"/* "$CAM_MOUNT/TeslaTrackMode"/* || true
 
 log "Moved $NUM_FILES_MOVED file(s), failed to copy $NUM_FILES_FAILED, deleted $NUM_FILES_DELETED."
 
